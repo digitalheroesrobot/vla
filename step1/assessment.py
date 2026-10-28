@@ -1,5 +1,5 @@
 """
-magine you have a robot moving around a 5 × 5 grid.
+Imagine you have a robot moving around a 5 × 5 grid.
 
 The robot knows its current position, and the target has a position on the same grid.
 
