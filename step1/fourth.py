@@ -51,6 +51,14 @@ ACTIONS = {
     4: (0, 1),
 }
 
+ACTION_NAMES = {
+    0: "Stay",
+    1: "Left",
+    2: "Right",
+    3: "Down",
+    4: "Up",
+}
+
 DEVICE = torch.device("cpu")
 
 random.seed(7)
@@ -63,7 +71,7 @@ torch.manual_seed(7)
 # ============================================================
 
 def inside_grid(position):
-    """Return True if a position is inside the grid."""
+    """Check whether a position is inside the grid."""
 
     x, y = position
 
@@ -74,13 +82,13 @@ def inside_grid(position):
 
 
 def is_obstacle(position, obstacles):
-    """Return True if a cell contains an obstacle."""
+    """Check whether a position contains an obstacle."""
 
     return position in obstacles
 
 
 def valid_position(position, obstacles):
-    """Check grid boundaries and obstacles."""
+    """Check boundaries and obstacles."""
 
     return (
         inside_grid(position)
@@ -89,7 +97,7 @@ def valid_position(position, obstacles):
 
 
 def get_next_position(position, action):
-    """Calculate where an action would move the robot."""
+    """Calculate the position after an action."""
 
     x, y = position
     dx, dy = ACTIONS[action]
@@ -98,16 +106,15 @@ def get_next_position(position, action):
 
 
 # ============================================================
-# 3. PATHFINDING: GENERATE SUCCESSFUL DEMONSTRATIONS
+# 3. PATHFINDING
 # ============================================================
 
 def find_path(start, goal, obstacles):
     """
-    Find a shortest safe path using breadth-first search.
+    Find a shortest safe route using BFS.
 
-    Returns:
-        A list of positions from start to goal,
-        or None if no path exists.
+    Returns a list of positions from start to goal.
+    Returns None if no safe route exists.
     """
 
     if not valid_position(start, obstacles):
@@ -118,18 +125,17 @@ def find_path(start, goal, obstacles):
 
     queue = deque([start])
 
-    # Remember how we reached each position.
+    # Remember the position from which each cell was reached.
     parent = {start: None}
 
     while queue:
 
         current = queue.popleft()
 
-        # Have we reached the goal?
         if current == goal:
             break
 
-        # Try all four movement directions.
+        # Try left, right, down, and up.
         for action in [1, 2, 3, 4]:
 
             next_position = get_next_position(
@@ -137,8 +143,6 @@ def find_path(start, goal, obstacles):
                 action
             )
 
-            # Skip walls, obstacles, and already
-            # visited positions.
             if (
                 valid_position(next_position, obstacles)
                 and next_position not in parent
@@ -146,11 +150,10 @@ def find_path(start, goal, obstacles):
                 parent[next_position] = current
                 queue.append(next_position)
 
-    # The goal was never reached.
     if goal not in parent:
         return None
 
-    # Reconstruct the path by following parent links.
+    # Reconstruct the path from goal back to start.
     path = []
     current = goal
 
@@ -164,34 +167,32 @@ def find_path(start, goal, obstacles):
 
 
 # ============================================================
-# 4. ENCODE THE ROBOT'S OBSERVATION
+# 4. ENCODE THE OBSERVATION
 # ============================================================
 
 def encode_observation(position, goal, obstacles):
     """
-    Convert the environment into 29 numerical inputs.
+    Create 29 numerical input features.
 
-    First 4 values:
-        Robot x, robot y, target x, target y
+    4 coordinate features:
+        Robot x, robot y, goal x, goal y
 
-    Remaining 25 values:
-        One value for every grid cell.
+    25 obstacle features:
         1 = obstacle
         0 = free cell
     """
 
     robot_x, robot_y = position
-    target_x, target_y = goal
+    goal_x, goal_y = goal
 
-    # Normalize coordinates to approximately 0..1.
     features = [
         robot_x / (GRID_SIZE - 1),
         robot_y / (GRID_SIZE - 1),
-        target_x / (GRID_SIZE - 1),
-        target_y / (GRID_SIZE - 1),
+        goal_x / (GRID_SIZE - 1),
+        goal_y / (GRID_SIZE - 1),
     ]
 
-    # Encode the complete obstacle map.
+    # Encode the grid row by row.
     for y in range(GRID_SIZE):
         for x in range(GRID_SIZE):
 
@@ -204,7 +205,7 @@ def encode_observation(position, goal, obstacles):
 
 
 # ============================================================
-# 5. CREATE TRAINING EXAMPLES
+# 5. GENERATE TRAINING DATA
 # ============================================================
 
 def generate_training_data(number_of_examples=2500):
@@ -222,7 +223,7 @@ def generate_training_data(number_of_examples=2500):
 
         attempts += 1
 
-        # Generate a random obstacle layout.
+        # Randomly generate obstacles.
         obstacles = set()
 
         for y in range(GRID_SIZE):
@@ -231,7 +232,7 @@ def generate_training_data(number_of_examples=2500):
                 if random.random() < 0.18:
                     obstacles.add((x, y))
 
-        # Choose random start and target cells.
+        # Choose random starting and target positions.
         start = (
             random.randrange(GRID_SIZE),
             random.randrange(GRID_SIZE),
@@ -242,47 +243,40 @@ def generate_training_data(number_of_examples=2500):
             random.randrange(GRID_SIZE),
         )
 
-        # Start and goal must be different.
         if start == goal:
             continue
 
-        # Keep start and goal clear.
+        # Start and goal must remain unblocked.
         obstacles.discard(start)
         obstacles.discard(goal)
 
-        # Generate a successful demonstration.
+        # Find a safe route.
         path = find_path(start, goal, obstacles)
 
-        # Skip environments without a valid route.
         if path is None or len(path) < 2:
             continue
 
-        # Each transition becomes a training example.
+        # Convert each step of the route into a training example.
         for index in range(len(path) - 1):
 
             current_position = path[index]
             next_position = path[index + 1]
 
-            dx = (
-                next_position[0]
-                - current_position[0]
-            )
+            dx = next_position[0] - current_position[0]
+            dy = next_position[1] - current_position[1]
 
-            dy = (
-                next_position[1]
-                - current_position[1]
-            )
-
-            # Convert the demonstrated movement
-            # into its corresponding action label.
             if (dx, dy) == (-1, 0):
                 action = 1
+
             elif (dx, dy) == (1, 0):
                 action = 2
+
             elif (dx, dy) == (0, -1):
                 action = 3
+
             elif (dx, dy) == (0, 1):
                 action = 4
+
             else:
                 continue
 
@@ -342,7 +336,7 @@ class RobotBrain(nn.Module):
 
 
 # ============================================================
-# 7. TRAIN THE AI
+# 7. TRAIN THE NEURAL NETWORK
 # ============================================================
 
 def train_robot():
@@ -351,7 +345,7 @@ def train_robot():
 
     X, y = generate_training_data()
 
-    # Split examples into training and test sets.
+    # Randomly split examples into training and testing sets.
     permutation = torch.randperm(len(X))
 
     split = int(len(X) * 0.8)
@@ -382,7 +376,6 @@ def train_robot():
 
         model.train()
 
-        # Predict actions for the training examples.
         predictions = model(X_train)
 
         loss = loss_function(
@@ -424,10 +417,36 @@ def train_robot():
 
 
 # ============================================================
-# 8. AI ACTION SELECTION
+# 8. IMPROVED AI ACTION SELECTION
 # ============================================================
 
 def choose_action(model, position, goal, obstacles):
+    """
+    Use the neural network to score actions.
+
+    Then restrict the choice to actions that:
+    1. Stay inside the grid.
+    2. Avoid obstacles.
+    3. Reduce the shortest remaining path by one step.
+
+    This prevents the robot from oscillating between cells
+    when a safe route to the target exists.
+    """
+
+    # Find the shortest safe route from the current position.
+    current_path = find_path(
+        position,
+        goal,
+        obstacles
+    )
+
+    # No safe route exists.
+    if current_path is None:
+        return 0
+
+    # The robot is already at its target.
+    if len(current_path) <= 1:
+        return 0
 
     observation = encode_observation(
         position,
@@ -444,11 +463,59 @@ def choose_action(model, position, goal, obstacles):
 
     with torch.no_grad():
 
-        action_scores = model(input_tensor)
+        # The model scores all five possible actions.
+        action_scores = model(input_tensor)[0].clone()
 
-        action = action_scores.argmax(dim=1).item()
+        # Initially, every action is disallowed.
+        allowed_actions = []
 
-    return action
+        current_distance = len(current_path) - 1
+
+        # Consider each movement direction.
+        for action in range(1, NUM_ACTIONS):
+
+            next_position = get_next_position(
+                position,
+                action
+            )
+
+            # Reject obstacles and positions outside the grid.
+            if not valid_position(
+                next_position,
+                obstacles
+            ):
+                continue
+
+            # Find the shortest remaining route after this move.
+            next_path = find_path(
+                next_position,
+                goal,
+                obstacles
+            )
+
+            if next_path is None:
+                continue
+
+            next_distance = len(next_path) - 1
+
+            # Only allow moves that reduce the shortest
+            # remaining distance by exactly one.
+            if next_distance == current_distance - 1:
+                allowed_actions.append(action)
+
+        # If a path exists, at least one progress-making
+        # action should be available.
+        if not allowed_actions:
+            return 0
+
+        # Select the model's highest-scoring action
+        # among the allowed actions.
+        best_action = max(
+            allowed_actions,
+            key=lambda action: action_scores[action].item()
+        )
+
+    return best_action
 
 
 # ============================================================
@@ -464,7 +531,7 @@ def run_simulation(model):
     )
 
     pygame.display.set_caption(
-        "AI Robot - Obstacle Navigation"
+        "AI Robot - Smart Obstacle Navigation"
     )
 
     clock = pygame.time.Clock()
@@ -477,7 +544,7 @@ def run_simulation(model):
 
     goal = (4, 4)
 
-    # A vertical wall with a gap at the bottom.
+    # Vertical wall with gaps at the top and bottom.
     obstacles = {
         (2, 1),
         (2, 2),
@@ -489,9 +556,58 @@ def run_simulation(model):
     running = True
     autonomous = False
     steps = 0
+
     message = "SPACE: step | A: auto | R: reset"
 
     last_auto_move = 0
+
+    def perform_ai_step():
+
+        nonlocal robot_position
+        nonlocal steps
+        nonlocal trail
+        nonlocal message
+        nonlocal autonomous
+
+        if robot_position == goal:
+            message = "Target reached!"
+            autonomous = False
+            return
+
+        action = choose_action(
+            model,
+            robot_position,
+            goal,
+            obstacles
+        )
+
+        proposed_position = get_next_position(
+            robot_position,
+            action
+        )
+
+        # Final safety check before moving.
+        if not valid_position(
+            proposed_position,
+            obstacles
+        ):
+            message = "Safety check blocked a move!"
+            autonomous = False
+            return
+
+        robot_position = proposed_position
+
+        trail.append(robot_position)
+        steps += 1
+
+        message = (
+            f"AI action: {ACTION_NAMES[action]} | "
+            f"Steps: {steps}"
+        )
+
+        if robot_position == goal:
+            message = f"Target reached in {steps} steps!"
+            autonomous = False
 
     while running:
 
@@ -508,56 +624,21 @@ def run_simulation(model):
                     running = False
 
                 elif event.key == pygame.K_SPACE:
-
-                    if robot_position != goal:
-                        action = choose_action(
-                            model,
-                            robot_position,
-                            goal,
-                            obstacles
-                        )
-
-                        proposed_position = get_next_position(
-                            robot_position,
-                            action
-                        )
-
-                        if valid_position(
-                            proposed_position,
-                            obstacles
-                        ):
-                            robot_position = proposed_position
-
-                            if (
-                                not trail
-                                or trail[-1] != robot_position
-                            ):
-                                trail.append(robot_position)
-
-                            steps += 1
-
-                            message = (
-                                f"AI action: {action} | "
-                                f"Steps: {steps}"
-                            )
-
-                        else:
-                            message = (
-                                "AI predicted an invalid move!"
-                            )
-
-                    else:
-                        message = "Target reached!"
+                    perform_ai_step()
 
                 elif event.key == pygame.K_a:
 
-                    autonomous = not autonomous
+                    if robot_position == goal:
+                        message = "Target reached! Press R to reset."
+                        autonomous = False
+                    else:
+                        autonomous = not autonomous
 
-                    message = (
-                        "Autonomous mode ON"
-                        if autonomous
-                        else "Autonomous mode OFF"
-                    )
+                        message = (
+                            "Autonomous mode ON"
+                            if autonomous
+                            else "Autonomous mode OFF"
+                        )
 
                 elif event.key == pygame.K_r:
 
@@ -594,62 +675,26 @@ def run_simulation(model):
                         )
                         and clicked_position != robot_position
                     ):
+
                         goal = clicked_position
 
                         trail = [robot_position]
                         steps = 0
+                        autonomous = False
 
-                        message = (
-                            f"New target: {goal}"
-                        )
+                        message = f"New target: {goal}"
 
-        # Autonomous AI movement.
+        # ----------------------------------------------------
+        # AUTONOMOUS MOVEMENT
+        # ----------------------------------------------------
+
         if (
             autonomous
             and robot_position != goal
             and current_time - last_auto_move > 350
         ):
 
-            action = choose_action(
-                model,
-                robot_position,
-                goal,
-                obstacles
-            )
-
-            proposed_position = get_next_position(
-                robot_position,
-                action
-            )
-
-            if valid_position(
-                proposed_position,
-                obstacles
-            ):
-
-                robot_position = proposed_position
-
-                if (
-                    not trail
-                    or trail[-1] != robot_position
-                ):
-                    trail.append(robot_position)
-
-                steps += 1
-
-                message = (
-                    f"AI action: {action} | "
-                    f"Steps: {steps}"
-                )
-
-            else:
-                message = (
-                    "AI predicted an invalid move!"
-                )
-
-                # Prevent an endless stream of
-                # identical error messages.
-                autonomous = False
+            perform_ai_step()
 
             last_auto_move = current_time
 
@@ -659,6 +704,7 @@ def run_simulation(model):
 
         screen.fill((245, 245, 245))
 
+        # Draw the grid and obstacles.
         for y in range(GRID_SIZE):
             for x in range(GRID_SIZE):
 
@@ -682,7 +728,6 @@ def run_simulation(model):
                     1
                 )
 
-                # Draw obstacles.
                 if (x, y) in obstacles:
 
                     pygame.draw.rect(
@@ -692,7 +737,7 @@ def run_simulation(model):
                         border_radius=8
                     )
 
-        # Draw the trail.
+        # Draw the robot's trail.
         for x, y in trail:
 
             center = (
@@ -741,7 +786,7 @@ def run_simulation(model):
             22
         )
 
-        # Draw status panel.
+        # Draw the status panel.
         panel_y = GRID_SIZE * CELL_SIZE
 
         pygame.draw.rect(
@@ -763,7 +808,10 @@ def run_simulation(model):
             (20, 20, 20)
         )
 
-        screen.blit(status, (10, panel_y + 10))
+        screen.blit(
+            status,
+            (10, panel_y + 10)
+        )
 
         instruction = small_font.render(
             message,
@@ -784,7 +832,7 @@ def run_simulation(model):
 
 
 # ============================================================
-# 10. START EVERYTHING
+# 10. START THE PROGRAM
 # ============================================================
 
 if __name__ == "__main__":
