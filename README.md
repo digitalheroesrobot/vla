@@ -63,6 +63,138 @@ perception-to-action pipeline.
    obstacle-aware navigation in the terminal, then
    [`fourth.py`](./step1/fourth.py) for a visual exercise.
 
+## Next steps: from basic learning to robot intelligence
+
+The following extensions build on Step 1 and introduce the concepts needed to move from small learned policies to modern robotic perception and action systems.
+
+### 1. Understand the difference between training and testing
+
+- Learn why a model that performs well on training examples might fail on new situations.
+- Recommended exercise: `fifth.py`
+- Split data into training and testing sets.
+- Train a model using one set of examples.
+- Evaluate its predictions on unseen examples.
+- Why it matters: a robot must work in situations it has never encountered during training. Memorizing training examples is not enough.
+
+### 2. Learn how to create a dataset for robot learning
+
+- Recommended exercise: `dataset.py`
+- Generate robot position and target position examples.
+- Store observations and corresponding actions.
+- Understand features, labels, and training samples.
+- Save and load datasets using PyTorch or NumPy.
+- Visualize the distribution of training examples.
+- Why it matters: modern robot learning depends heavily on datasets. Before training a robot policy, we need examples of what the robot observes and what it should do.
+
+### 3. Understand classification versus regression
+
+- Recommended exercise: `sixth.py`
+- Learn the difference between classification and regression.
+- Predict discrete actions such as left, right, and forward.
+- Predict continuous values such as movement speed and joint positions.
+- Experiment with Softmax, cross-entropy loss, and mean squared error.
+- Compare discrete-action and continuous-action models.
+- Why it matters: robots use both discrete decisions and continuous control commands. Understanding these two prediction problems is essential for robot action generation.
+
+### 4. Introduce computer vision and image-based perception
+
+- Recommended exercise: `vision.py`
+- Understand how images are represented as tensors.
+- Load and visualize images using Python.
+- Introduce image classification with a simple neural network.
+- Learn the basic idea of convolutional neural networks (CNNs).
+- Train a model to recognize simple objects or target positions.
+- Why it matters: so far, the robot receives structured numerical information such as its position and the target position. Real robots usually receive visual observations from cameras and must learn to extract useful information from images.
+
+### 5. Connect visual observations to robot actions
+
+- Recommended exercise: `vision_to_action.py`
+- Generate or collect images of a robot's environment.
+- Use an image as the model input instead of manually provided coordinates.
+- Train a model to predict the appropriate movement.
+- Connect the model's predictions to the existing simulator.
+- Compare coordinate-based and image-based policies.
+- Why it matters: this is an important transition from simple machine learning to robot perception and control. The model begins to learn what action to take from visual information.
+
+### 6. Introduce imitation learning
+
+- Recommended exercise: `imitation_learning.py`
+- Understand the idea of learning from demonstrations.
+- Create demonstrations using a hand-written policy or BFS.
+- Store observations and corresponding expert actions.
+- Train a neural network to imitate the expert.
+- Compare the learned policy with the original expert policy.
+- Why it matters: instead of manually programming every robot behavior, we can demonstrate the desired behavior and train a model to reproduce it. This is one of the fundamental approaches used in modern robot learning.
+
+### 7. Understand sequential observations and robot history
+
+- Recommended exercise: `sequence_learning.py`
+- Understand why a single observation may not contain enough information.
+- Introduce sequences of observations and actions.
+- Learn the basic idea of RNNs, LSTMs, and Transformers.
+- Predict an action using multiple previous observations.
+- Compare single-frame and sequence-based policies.
+- Why it matters: robot actions often depend on what happened previously, not just what the robot currently sees. Temporal information becomes especially important when manipulating objects.
+
+### 8. Introduce natural language instructions for robots
+
+- Recommended exercise: `language_conditioning.py`
+- Understand how text can be represented as tokens and embeddings.
+- Introduce the relationship between language and robot tasks.
+- Convert simple instructions into task representations.
+- Condition a policy on both the robot observation and a language instruction.
+- Experiment with instructions such as "move to the red object" or "go to the left side."
+- Why it matters: a Vision-Language-Action model must understand what a person wants the robot to accomplish, not just recognize objects or predict movements.
+
+### 9. Learn robot action representations
+
+- Recommended exercise: `robot_actions.py`
+- Understand the difference between discrete and continuous actions.
+- Introduce joint positions, joint velocities, and end-effector positions.
+- Learn the basics of robot coordinate systems.
+- Understand forward and inverse kinematics.
+- Represent robot actions as numerical vectors.
+- Introduce action sequences and action chunks.
+- Why it matters: a model's output must eventually become something a physical robot can execute. Understanding robot action representations connects machine learning with actual robot control.
+
+### 10. Connect the learned model to a robot simulator
+
+- Recommended exercise: `robot_simulation.py`
+- Introduce a physics-based robot simulator.
+- Understand robot observations and action interfaces.
+- Connect a trained policy to a simulated robot.
+- Execute actions and observe the resulting robot behavior.
+- Understand the difference between predicting an action and successfully executing it.
+- Introduce feedback-based control.
+- Why it matters: a robot policy must operate in a real control loop. It receives observations, generates actions, interacts with the environment, and observes the consequences.
+
+### 11. Build a miniature Vision-Language-Action pipeline
+
+- Recommended exercise: `mini_vla.py`
+- Combine visual observations with natural language instructions.
+- Use a vision encoder to extract visual features.
+- Use a language encoder to represent the instruction.
+- Combine visual and language information.
+- Train a model to predict robot actions.
+- Execute the predicted actions in a simple simulator.
+- Why it matters: this exercise brings together the three fundamental components of VLA:
+  - Vision: what does the robot see?
+  - Language: what does the human want?
+  - Action: what should the robot do?
+
+This progression leads naturally toward modern VLA architectures and robot learning.
+
+### Recommended reading and implementation exercises
+
+- Study Vision-Language Models (VLMs).
+- Understand how visual and language encoders work together.
+- Learn about Transformer architectures and attention.
+- Understand behavior cloning and large-scale robot demonstration datasets.
+- Explore action tokenization and action chunking.
+- Study the basic architecture of modern VLA systems.
+- Explore how pretrained models can be adapted to robot manipulation tasks.
+- Why it matters: this final step introduces the ideas behind modern VLA research and prepares developers to understand and work with real-world VLA implementations.
+
 ## Technical setup
 
 Run scripts from the repository root with Python and the required packages
